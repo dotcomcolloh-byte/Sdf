@@ -41,7 +41,16 @@ object Ytdlp {
             System.err.println("YTDLP_DIAG category=client_fallback primary=${primary.category} selected=android_vr")
             return@withContext fallback.output
         }
-        System.err.println("YTDLP_DIAG category=all_clients_failed primary=${primary.category ?: "unknown"} fallback=${fallback.category ?: "unknown"} primary_exit=${primary.exitCode ?: -1} fallback_exit=${fallback.exitCode ?: -1} primary_stderr_bytes=${primary.stderrBytes} fallback_stderr_bytes=${fallback.stderrBytes}")
+        if (fallback.category !in alternateClientCategories) {
+            System.err.println("YTDLP_DIAG category=all_clients_failed primary=${primary.category ?: "unknown"} fallback=${fallback.category ?: "unknown"} primary_exit=${primary.exitCode ?: -1} fallback_exit=${fallback.exitCode ?: -1} primary_stderr_bytes=${primary.stderrBytes} fallback_stderr_bytes=${fallback.stderrBytes}")
+            return@withContext null
+        }
+        val safari = runForClient(args, timeoutSec, "web_safari")
+        if (!safari.output.isNullOrBlank()) {
+            System.err.println("YTDLP_DIAG category=client_fallback primary=${primary.category} secondary=${fallback.category} selected=web_safari")
+            return@withContext safari.output
+        }
+        System.err.println("YTDLP_DIAG category=all_clients_failed primary=${primary.category ?: "unknown"} fallback=${fallback.category ?: "unknown"} tertiary=${safari.category ?: "unknown"} primary_exit=${primary.exitCode ?: -1} fallback_exit=${fallback.exitCode ?: -1} tertiary_exit=${safari.exitCode ?: -1} primary_stderr_bytes=${primary.stderrBytes} fallback_stderr_bytes=${fallback.stderrBytes} tertiary_stderr_bytes=${safari.stderrBytes}")
         null
     }
 
