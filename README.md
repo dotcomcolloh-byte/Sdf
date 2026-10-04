@@ -23,13 +23,15 @@ Set the deployed backend at Android build time with `./gradlew -p android :app:a
 ## How it works
 - `GET /api/videos?q&page&size` paged search (6h memory + disk cache, stale fallback) -> app infinite scroll.
 - `GET /api/formats/{id}` real qualities/sizes -> download dialog (video 144p..best, audio MP3 64-320k).
-- `GET /api/stream/{id}?quality` -> `cache` (server file) | `proxy` (instant 360p pipe) | `preparing` (polled). Every play also caches the file server-side.
+- `GET /api/stream/{id}?quality` -> completed server download | HLS for Auto | Range-capable progressive proxy for an explicit quality (or HLS fallback).
 - **Chunked playback:** `GET /api/stream/{id}` starts ffmpeg (video copied, audio -> AAC) writing 3s fMP4 HLS segments from yt-dlp's separate video/audio URLs; the app plays as soon as 2 segments exist (~2-4s) while ffmpeg keeps running ahead. Finished folders stay as the server cache (`VIDTUBE_HLS_GB`, default 15).
 - `GET /api/proxy/{id}`, `GET /api/file/{name}` both support HTTP Range (seek, resume).
 - `POST /api/download` -> server job (yt-dlp -c, real % progress, persisted in jobs.json, auto-resumed on restart).
 - App `DownloadWorker` (WorkManager, foreground service) pulls the finished file with Range into app storage; on network loss it waits for connectivity and continues from the last byte.
 - ExoPlayer: 1.5s start threshold, 120s read-ahead, 1 GB disk cache, next-video prefetch, auto re-prepare after connection loss.
 - Only use with public videos you're permitted to download.
+
+YouTube extraction uses yt-dlp's token-free `web_embedded` player client. It can only resolve videos whose owners allow embedding; age/region-restricted or non-embeddable videos may not have playable formats without a separately configured PO-token provider or authentication.
 
 ## Campaigns / ads
 Settings → **Create campaigns** → Google sign-in → pricing, ad form, upload, Paystack checkout.

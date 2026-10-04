@@ -13,10 +13,10 @@ object Ytdlp {
     fun validId(id: String) = ID.matches(id)
     fun watchUrl(id: String) = "https://www.youtube.com/watch?v=$id"
 
-    /** Runs yt-dlp, returns stdout or null. stderr is DISCARDED so warnings can't corrupt JSON. */
+    /** Runs yt-dlp with YouTube's token-free embedded client; only embeddable public videos can be resolved. */
     suspend fun run(args: List<String>, timeoutSec: Long = 90): String? = withContext(Dispatchers.IO) {
         try {
-            val p = ProcessBuilder(listOf("yt-dlp", "--no-warnings") + args)
+            val p = ProcessBuilder(listOf("yt-dlp", "--no-warnings", "--extractor-args", "youtube:player_client=web_embedded") + args)
                 .redirectError(ProcessBuilder.Redirect.DISCARD).start()
             val reader = async { p.inputStream.bufferedReader().use { it.readText() } }
             if (!p.waitFor(timeoutSec, TimeUnit.SECONDS)) { p.destroyForcibly(); reader.cancel(); null }

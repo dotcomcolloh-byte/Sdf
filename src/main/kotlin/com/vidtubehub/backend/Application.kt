@@ -92,12 +92,16 @@ fun Application.module() {
             val want = if (q == 0) 720 else q.coerceIn(144, 4320)
             val hit = jobs.ready(id, "video", want) ?: if (q == 0) jobs.bestReadyVideo(id) else null
             if (hit != null) return@get call.respond(StreamInfo("/api/file/${hit.fileName}", "cache", hit.quality, 100))
+            if (q > 0) Ytdlp.progressive(id, want)?.let {
+                return@get call.respond(StreamInfo("/api/proxy/$id?q=$want", "proxy", it.height, 0))
+            }
             hls.ensure(id, want)
             // hold the request briefly so the app gets a playable URL in ONE round trip
             withTimeoutOrNull(12_000) { while (!hls.playlistReady(id, want) && hls.status(id, want) != "failed") delay(200) }
             if (hls.playlistReady(id, want)) return@get call.respond(StreamInfo("/api/hls/$id/$want/index.m3u8", "hls", want, 100))
             if (hls.status(id, want) == "failed") {
-                if (q == 0) Ytdlp.progressive(id, 360)?.let { return@get call.respond(StreamInfo("/api/proxy/$id?q=360", "proxy", it.height, 0)) }
+                val fallbackQ = if (q == 0) 360 else want
+                Ytdlp.progressive(id, fallbackQ)?.let { return@get call.respond(StreamInfo("/api/proxy/$id?q=$fallbackQ", "proxy", it.height, 0)) }
                 return@get call.respondText("stream unavailable", status = HttpStatusCode.BadGateway)
             }
             call.respond(StreamInfo(null, "preparing", want, 0))
