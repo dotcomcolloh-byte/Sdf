@@ -1,9 +1,12 @@
 .git
 .gradle
+.kotlin
 **/build
-**/.gradle
-**/.env
-**/local.properties
+android
+cache
+.env
+.env.*
+!.env.example
 *.apk
 *.aab
 *.jks

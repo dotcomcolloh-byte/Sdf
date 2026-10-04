@@ -1,11 +1,24 @@
+# Gradle and generated output
 .gradle/
+.kotlin/
 **/build/
 local.properties
-*.iml
-.idea/
-.DS_Store
+
+# Runtime data; keep the bundled starter feed only
+/cache/*
+!/cache/feed.json
+/cache/pages/
+/cache/media/
+
+# Secrets and signing material
 .env
 .env.*
-!backend/.env.example
+!.env.example
 *.jks
 *.keystore
+key.properties
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store

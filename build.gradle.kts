@@ -1,7 +1,18 @@
-plugins {
-    id("com.android.application") version "8.7.3" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.0.21" apply false
+plugins { kotlin("jvm") version "2.0.21"; kotlin("plugin.serialization") version "2.0.21"; application }
+repositories {
+    maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2") }
+    mavenCentral()
+}
+application { mainClass.set("com.vidtubehub.backend.ApplicationKt") }
+dependencies {
+    val ktor = "3.0.3"
+    implementation("io.ktor:ktor-server-core-jvm:$ktor")
+    implementation("io.ktor:ktor-server-netty-jvm:$ktor")
+    implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor")
+    implementation("io.ktor:ktor-server-partial-content-jvm:$ktor")
+    implementation("io.ktor:ktor-server-auto-head-response-jvm:$ktor")
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktor")
+    implementation("ch.qos.logback:logback-classic:1.5.16")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }

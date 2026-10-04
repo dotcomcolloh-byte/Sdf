@@ -1,22 +1,20 @@
+# Build the standalone backend distribution from the repository root.
 FROM gradle:8.11.1-jdk21 AS build
 WORKDIR /src
-COPY backend ./backend
-RUN gradle --no-daemon -p backend installDist
+COPY . .
+RUN gradle installDist --no-daemon -q
 
 FROM eclipse-temurin:21-jre-jammy
-ENV PORT=8080 \
-    VIDTUBE_DATA=/var/lib/vidtube \
-    PATH="/opt/venv/bin:${PATH}"
 RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Pipeline-Depth=0 update \
-    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends ffmpeg python3 python3-venv ca-certificates \
-    && python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir --upgrade yt-dlp \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /opt/vidtube
-COPY --from=build /src/backend/build/install/vidtube-hub-backend/ ./
-RUN mkdir -p /var/lib/vidtube && chown -R 10001:10001 /opt/vidtube /var/lib/vidtube
-USER 10001:10001
+ && apt-get -o Acquire::Retries=5 install -y --no-install-recommends ffmpeg python3 curl ca-certificates unzip \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL --retry 5 --retry-all-errors https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+ && chmod +x /usr/local/bin/yt-dlp \
+ && curl -fsSL --retry 5 --retry-all-errors https://deno.land/install.sh -o /tmp/install-deno.sh \
+ && DENO_INSTALL=/usr/local sh /tmp/install-deno.sh \
+ && rm -f /tmp/install-deno.sh
+COPY --from=build /src/build/install/vidtube-hub-backend /app
+ENV VIDTUBE_DATA=/data
 EXPOSE 8080
-VOLUME ["/var/lib/vidtube"]
-ENTRYPOINT ["/opt/vidtube/bin/vidtube-hub-backend"]
+# Update yt-dlp where possible, then start the API server.
+CMD ["sh", "-c", "yt-dlp -U >/dev/null 2>&1 || true; exec /app/bin/vidtube-hub-backend"]

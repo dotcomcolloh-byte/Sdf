@@ -3,12 +3,12 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id(
 android { namespace = "com.vidtubehub.video.app"; compileSdk = 35; buildToolsVersion = "35.0.0"
     defaultConfig { applicationId = "com.vidtubehub.video.app"; minSdk = 26; targetSdk = 35; versionCode = 3; versionName = "1.2.0"
         // Deployed backend. Override: ./gradlew assembleRelease -PapiBaseUrl=https://api.yourdomain.com
-        buildConfigField("String", "API_BASE_URL", "\"${(project.findProperty("apiBaseUrl") as String?) ?: "https://api.example.com"}\"")
+        buildConfigField("String", "API_BASE_URL", "\"${(project.findProperty("apiBaseUrl") as String?) ?: "https://api-production-b04a.up.railway.app"}\"")
         manifestPlaceholders["cleartext"] = "false"
         // WEB OAuth client id (same one you put in backend GOOGLE_CLIENT_IDS). ./gradlew ... -PgoogleWebClientId=xxxx.apps.googleusercontent.com
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${(project.findProperty("googleWebClientId") as String?) ?: ""}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${(project.findProperty("googleWebClientId") as String?) ?: "690981910278-20difr2paa1o52aod7pb22go0elk61ou.apps.googleusercontent.com"}\"")
     }
-    buildTypes { debug { manifestPlaceholders["cleartext"] = "true"; if (project.hasProperty("apiBaseUrl").not()) buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"") } }
+    buildTypes { debug { manifestPlaceholders["cleartext"] = "true" } }
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
