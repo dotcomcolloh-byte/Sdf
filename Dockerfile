@@ -16,5 +16,6 @@ RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Pipeline-Depth=0 update \
 COPY --from=build /src/build/install/vidtube-hub-backend /app
 ENV VIDTUBE_DATA=/data
 EXPOSE 8080
-# Update yt-dlp where possible, then start the API server.
-CMD ["sh", "-c", "yt-dlp -U >/dev/null 2>&1 || true; exec /app/bin/vidtube-hub-backend"]
+# The yt-dlp version is fixed by the release binary fetched at image build time.
+# Log tool versions only; do not emit extractor stderr, URLs, or credentials.
+CMD ["sh", "-c", "ytdlp_version=$(yt-dlp --version 2>/dev/null || echo unavailable); deno_version=$(deno --version 2>/dev/null | head -n 1 || echo unavailable); ffmpeg_version=$(ffmpeg -version 2>/dev/null | head -n 1 || echo unavailable); echo \"VidTube runtime: yt-dlp=$ytdlp_version deno=$deno_version ffmpeg=$ffmpeg_version\"; exec /app/bin/vidtube-hub-backend"]

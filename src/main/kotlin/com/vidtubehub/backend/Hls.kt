@@ -29,7 +29,12 @@ class Hls(root: File, private val scope: CoroutineScope) {
         val key = k(id, q)
         if (status(id, q).let { it == "running" || it == "done" }) return
         states[key] = "running"
-        scope.launch(Dispatchers.IO) { runCatching { run(id, q, key) }.onFailure { states[key] = "failed" } }
+        scope.launch(Dispatchers.IO) {
+            runCatching { run(id, q, key) }.onFailure {
+                System.err.println("HLS_DIAG category=runner_exception exception=${it.javaClass.simpleName}")
+                states[key] = "failed"
+            }
+        }
     }
 
     private suspend fun run(id: String, q: Int, key: String) {
@@ -37,7 +42,11 @@ class Hls(root: File, private val scope: CoroutineScope) {
         val sel = "bv*[height<=$q][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=$q]+ba/b[height<=$q]/b"
         val urls = Ytdlp.run(listOf("--no-playlist", "-g", "-f", sel, Ytdlp.watchUrl(id)), 60)
             ?.lines()?.map { it.trim() }?.filter { it.startsWith("http") }.orEmpty()
-        if (urls.isEmpty()) { states[key] = "failed"; return }
+        if (urls.isEmpty()) {
+            System.err.println("HLS_DIAG category=no_media_urls")
+            states[key] = "failed"
+            return
+        }
         val cmd = mutableListOf("ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin")
         urls.forEach { cmd += listOf("-user_agent", UA, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5", "-i", it) }
         if (urls.size >= 2) cmd += listOf("-map", "0:v:0", "-map", "1:a:0") else cmd += listOf("-map", "0:v:0", "-map", "0:a:0?")
@@ -48,7 +57,10 @@ class Hls(root: File, private val scope: CoroutineScope) {
         try {
             while (p.isAlive) delay(500)
         } finally { if (p.isAlive) p.destroyForcibly() }
-        if (p.exitValue() == 0) { File(d, ".done").writeText("1"); states.remove(key); trim() } else states[key] = "failed"
+        if (p.exitValue() == 0) { File(d, ".done").writeText("1"); states.remove(key); trim() } else {
+            System.err.println("HLS_DIAG category=ffmpeg_exit exit=${p.exitValue()}")
+            states[key] = "failed"
+        }
     }
 
     /** Keeps hls cache under VIDTUBE_HLS_GB (default 15), evicting least recently played folders. */

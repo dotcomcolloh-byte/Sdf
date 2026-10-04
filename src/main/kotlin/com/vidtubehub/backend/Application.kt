@@ -134,6 +134,7 @@ fun Application.module() {
                 val resp = withContext(Dispatchers.IO) { http.send(rb.GET().build(), HttpResponse.BodyHandlers.ofInputStream()) }
                 val code = resp.statusCode()
                 if (code in listOf(403, 404, 410) && attempt == 0) { resp.body().close(); Ytdlp.invalidate(id, q); continue }
+                if (code !in listOf(200, 206)) System.err.println("PROXY_DIAG category=upstream_http status=$code")
                 resp.headers().firstValue("Content-Range").orElse(null)?.let { call.response.header(HttpHeaders.ContentRange, it) }
                 call.response.header(HttpHeaders.AcceptRanges, "bytes")
                 val len = resp.headers().firstValueAsLong("Content-Length").let { if (it.isPresent) it.asLong else null }

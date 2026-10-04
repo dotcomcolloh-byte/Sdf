@@ -31,7 +31,7 @@ Set the deployed backend at Android build time with `./gradlew -p android :app:a
 - ExoPlayer: 1.5s start threshold, 120s read-ahead, 1 GB disk cache, next-video prefetch, auto re-prepare after connection loss.
 - Only use with public videos you're permitted to download.
 
-YouTube extraction uses yt-dlp's token-free `web_embedded` player client. It can only resolve videos whose owners allow embedding; age/region-restricted or non-embeddable videos may not have playable formats without a separately configured PO-token provider or authentication.
+YouTube extraction prefers yt-dlp's token-free `web_embedded` client and retries with the documented token-free `android_vr` client for eligible challenge failures. `android_vr` does not support made-for-kids videos. Age/region restrictions, rate limits, or YouTube bot checks can still make videos unavailable; broader access may require a separately configured PO-token provider or authentication.
 
 ## Campaigns / ads
 Settings → **Create campaigns** → Google sign-in → pricing, ad form, upload, Paystack checkout.
