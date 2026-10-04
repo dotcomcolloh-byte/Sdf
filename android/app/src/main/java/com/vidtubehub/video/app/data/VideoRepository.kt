@@ -83,9 +83,11 @@ class VideoRepository(private val ctx: Context) {
     suspend fun videos(q: String, page: Int) = cachedGet<Page>("/api/videos", mapOf("q" to q, "page" to "$page", "size" to "$PAGE_SIZE"))
     suspend fun formats(id: String) = cachedGet<Formats>("/api/formats/$id")
 
-    suspend fun stream(id: String, quality: Int, title: String = ""): StreamInfo =
-        client.get("${Settings.baseUrl}/api/stream/$id") { parameter("quality", quality); if (title.isNotBlank()) parameter("title", title) }
-            .also { if (!it.status.isSuccess()) throw IOException("HTTP ${it.status.value}: ${it.bodyAsText().take(120)}") }.body()
+    suspend fun stream(id: String, quality: Int, title: String = ""): StreamInfo {
+        val response = client.get("${Settings.baseUrl}/api/stream/$id") { parameter("quality", quality); if (title.isNotBlank()) parameter("title", title) }
+        if (!response.status.isSuccess()) throw ApiException("HTTP ${response.status.value}", response.status.value)
+        return response.body()
+    }
 
     private suspend fun HttpResponse.ok(): HttpResponse { if (!status.isSuccess()) throw ApiException(bodyAsText().take(200).ifBlank { "HTTP ${status.value}" }, status.value); return this }
     private fun HttpRequestBuilder.authed() { Account.token?.let { header(HttpHeaders.Authorization, "Bearer $it") } }

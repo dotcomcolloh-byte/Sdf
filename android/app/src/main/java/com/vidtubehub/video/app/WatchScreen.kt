@@ -1,6 +1,7 @@
 package com.vidtubehub.video.app
 
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -42,10 +43,12 @@ import com.vidtubehub.video.app.download.Downloader
 import com.vidtubehub.video.app.player.PlayerCache
 import com.vidtubehub.video.app.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.IOException
 
 @OptIn(UnstableApi::class)
 @Composable fun WatchScreen(req: PlayRequest, onBack: () -> Unit, onVideo: (PlayRequest) -> Unit) {
@@ -55,6 +58,8 @@ import java.io.File
     val player = remember { PlayerCache.newPlayer(ctx) }
     var quality by remember(video.id) { mutableIntStateOf(Settings.playQuality) } // 0 = auto
     var status by remember(video.id) { mutableStateOf(tr("Loading…")) }
+    var playbackFailed by remember(video.id) { mutableStateOf(false) }
+    var retryNonce by remember(video.id) { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(false) }; var buffering by remember { mutableStateOf(true) }
     var posMs by remember { mutableLongStateOf(0L) }; var durMs by remember { mutableLongStateOf(0L) }; var bufMs by remember { mutableLongStateOf(0L) }
     var dragging by remember { mutableStateOf(false) }; var controls by remember { mutableStateOf(true) }
@@ -83,7 +88,7 @@ import java.io.File
         val l = object : Player.Listener {
             override fun onIsPlayingChanged(p: Boolean) { playing = p }
             override fun onPlaybackStateChanged(s: Int) {
-                buffering = s == Player.STATE_BUFFERING; if (s == Player.STATE_READY) { retries = 0; status = "" }
+                buffering = s == Player.STATE_BUFFERING; if (s == Player.STATE_READY) { retries = 0; status = ""; playbackFailed = false }
                 if (s == Player.STATE_ENDED && Settings.autoplay) related.firstOrNull()?.let { onVideo(PlayRequest(it)) }
             }
             override fun onPlayerError(e: PlaybackException) {
@@ -92,7 +97,7 @@ import java.io.File
                     status = tr("Connection lost — resuming when back online…")
                     if (!ctx.isOnline()) ctx.onlineFlow().first { it } else delay(2000L * retries)
                     player.prepare(); player.playWhenReady = true // continues from the current position, cached ranges reused
-                } else status = "${tr("Playback error")}: ${e.errorCodeName}"
+                } else { buffering = false; playbackFailed = true; status = "${tr("Playback error")}: ${e.errorCodeName}" }
             }
         }
         player.addListener(l)
@@ -100,25 +105,36 @@ import java.io.File
     }
 
     // ---- resolve source: offline file > server cache > instant proxy; waits/polls if server is still preparing ----
-    LaunchedEffect(video.id, quality, req.localPath) {
+    LaunchedEffect(video.id, quality, req.localPath, retryNonce) {
         val resume = if (loadedFor == video.id) player.currentPosition else req.startMs
-        val local = req.localPath ?: DownloadStore.items.value.firstOrNull {
-            it.id == video.id && it.kind == "video" && it.status == "done" && it.path?.let { p -> File(p).exists() } == true && (quality == 0 || it.quality == quality)
-        }?.path
-        if (local != null) {
-            val src = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(ctx)).createMediaSource(MediaItem.fromUri(Uri.fromFile(File(local))))
-            player.setMediaSource(src, resume)
-        } else {
-            val s = retryWhenOnline(ctx, onWait = { status = tr("Waiting for connection…") }) {
-                var s = repo.stream(video.id, quality, video.title)
-                while (s.url == null) { status = "${tr("Preparing")} ${s.quality}p…"; delay(1000); s = repo.stream(video.id, quality, video.title) }
-                s
+        playbackFailed = false; buffering = true; status = tr("Loading…")
+        try {
+            val local = req.localPath ?: DownloadStore.items.value.firstOrNull {
+                it.id == video.id && it.kind == "video" && it.status == "done" && it.path?.let { p -> File(p).exists() } == true && (quality == 0 || it.quality == quality)
+            }?.path
+            if (local != null) {
+                val src = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(ctx)).createMediaSource(MediaItem.fromUri(Uri.fromFile(File(local))))
+                player.setMediaSource(src, resume)
+            } else {
+                val s = retryWhenOnline(ctx, onWait = { status = tr("Waiting for connection…") }) {
+                    var stream = repo.stream(video.id, quality, video.title)
+                    val startedAt = System.currentTimeMillis()
+                    while (stream.url == null) {
+                        if (System.currentTimeMillis() - startedAt > 120_000) throw IOException("Video preparation timed out")
+                        status = "${tr("Preparing")} ${stream.quality}p…"; delay(1000); stream = repo.stream(video.id, quality, video.title)
+                    }
+                    stream
+                }
+                val url = repo.absolute(s.url!!)
+                if (s.source == "hls") player.setMediaSource(PlayerCache.hlsSource(ctx, url), resume) // chunked: starts after first segments
+                else player.setMediaItem(MediaItem.fromUri(url), resume)
             }
-            val url = repo.absolute(s.url!!)
-            if (s.source == "hls") player.setMediaSource(PlayerCache.hlsSource(ctx, url), resume) // chunked: starts after first segments
-            else player.setMediaItem(MediaItem.fromUri(url), resume)
+            loadedFor = video.id; player.prepare(); player.playWhenReady = true
+        } catch (e: CancellationException) { throw e } catch (e: Exception) {
+            buffering = false; playbackFailed = true
+            val http = Regex("HTTP (\\d{3})").find(e.message.orEmpty())?.groupValues?.getOrNull(1)
+            status = if (http != null) "${tr("Playback error")} (HTTP $http)" else tr("Playback error")
         }
-        loadedFor = video.id; player.prepare(); player.playWhenReady = true
     }
 
     // ---- related list + infinite paging ----
@@ -167,8 +183,12 @@ import java.io.File
             AndroidView({ c -> PlayerView(c).apply { useController = false; this.player = player; resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT } }, Modifier.fillMaxSize())
             if (req.audioOnly) AsyncImage(video.thumbnailUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = .5f)
             if (buffering || status.isNotBlank()) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = Red, modifier = Modifier.size(36.dp))
+                if (buffering) CircularProgressIndicator(color = Red, modifier = Modifier.size(36.dp))
                 if (status.isNotBlank()) Text(status, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp).background(Color.Black.copy(alpha = .6f)).padding(6.dp))
+                if (playbackFailed) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { retryNonce++; playbackFailed = false; buffering = true; status = tr("Loading…") }) { Text(tr("Retry"), color = Color.White) }
+                    TextButton(onClick = { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${video.id}"))) } }) { Text(tr("Open in YouTube"), color = Color.White) }
+                }
             }
             if (controls) {
                 Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {

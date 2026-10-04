@@ -8,7 +8,7 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.vidtubehub.video.app.BuildConfig
 import com.vidtubehub.video.app.data.UserInfo
@@ -33,7 +33,7 @@ object Account {
 
     suspend fun signIn(activity: Activity): UserInfo {
         require(BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank()) { "GOOGLE_WEB_CLIENT_ID missing: build with -PgoogleWebClientId=..." }
-        val option = GetGoogleIdOption.Builder().setFilterByAuthorizedAccounts(false).setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID).setAutoSelectEnabled(false).build()
+        val option = GetSignInWithGoogleOption.Builder(BuildConfig.GOOGLE_WEB_CLIENT_ID).build()
         val res = CredentialManager.create(activity).getCredential(activity, GetCredentialRequest.Builder().addCredentialOption(option).build())
         val cred = res.credential
         require(cred is CustomCredential && cred.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) { "Unexpected credential" }

@@ -9,11 +9,12 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.callbackFlow
+import com.vidtubehub.video.app.data.ApiException
 
 fun Context.isOnline(): Boolean {
     val cm = getSystemService(ConnectivityManager::class.java)
     val c = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
-    return c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    return c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }
 fun Context.isMetered(): Boolean = getSystemService(ConnectivityManager::class.java).isActiveNetworkMetered
 
@@ -33,7 +34,7 @@ fun Context.onlineFlow(): Flow<Boolean> = callbackFlow {
 suspend fun <T> retryWhenOnline(ctx: Context, maxOnlineAttempts: Int = 4, onWait: () -> Unit = {}, block: suspend () -> T): T {
     var attempts = 0
     while (true) {
-        try { return block() } catch (e: CancellationException) { throw e } catch (e: Exception) {
+        try { return block() } catch (e: CancellationException) { throw e } catch (e: ApiException) { throw e } catch (e: Exception) {
             onWait()
             if (!ctx.isOnline()) ctx.onlineFlow().first { it } else if (++attempts >= maxOnlineAttempts) throw e else delay(2500)
         }

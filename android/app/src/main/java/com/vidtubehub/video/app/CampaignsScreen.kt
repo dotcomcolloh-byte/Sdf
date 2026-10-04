@@ -23,12 +23,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import coil.compose.AsyncImage
 import com.vidtubehub.video.app.auth.Account
 import com.vidtubehub.video.app.data.*
 import com.vidtubehub.video.app.util.tr
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -80,7 +84,17 @@ private fun fmt(n: Int) = NumberFormat.getIntegerInstance(Locale.US).format(n)
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(tr("Reach more users instantly"), color = Fg, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text(tr("Sign in with Google to create and pay for a campaign."), color = Muted, modifier = Modifier.padding(vertical = 12.dp))
-                Button({ scope.launch { busy = "signin"; runCatching { Account.signIn(act) }.onFailure { msg = it.message ?: "Sign-in cancelled" }; busy = "" } }, enabled = busy.isEmpty(), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) {
+                Button({ scope.launch {
+                    busy = "signin"; msg = ""
+                    try { Account.signIn(act) }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: GetCredentialCancellationException) { msg = tr("Google sign-in did not finish. If you selected an account, check Android OAuth package/SHA-1 setup.") }
+                    catch (e: NoCredentialException) { msg = tr("No Google account is available on this device. Add one in Android Settings and try again.") }
+                    catch (e: ApiException) { msg = if (e.code == 401) tr("Google token rejected by backend (HTTP 401). Check OAuth client configuration.") else "Google sign-in failed (HTTP ${e.code})." }
+                    catch (e: GetCredentialException) { msg = "Google sign-in failed (${e.javaClass.simpleName}). Check Google Play services and OAuth setup." }
+                    catch (e: Exception) { msg = e.message ?: tr("Google sign-in failed.") }
+                    finally { busy = "" }
+                } }, enabled=busy.isEmpty(), colors=ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) {
                     Text(tr("Sign in with Google"))
                 }
                 if (msg.isNotBlank()) Text(msg, color = Red, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
