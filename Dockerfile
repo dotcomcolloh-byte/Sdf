@@ -14,9 +14,9 @@ RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Pipeline-Depth=0 update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/vidtube
-COPY --from=build /src/backend/build/install/backend ./
+COPY --from=build /src/backend/build/install/vidtube-hub-backend/ ./
 RUN mkdir -p /var/lib/vidtube && chown -R 10001:10001 /opt/vidtube /var/lib/vidtube
 USER 10001:10001
 EXPOSE 8080
 VOLUME ["/var/lib/vidtube"]
-ENTRYPOINT ["/opt/vidtube/bin/backend"]
+ENTRYPOINT ["/opt/vidtube/bin/vidtube-hub-backend"]
