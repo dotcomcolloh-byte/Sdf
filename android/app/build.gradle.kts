@@ -6,7 +6,7 @@ android { namespace = "com.vidtubehub.video.app"; compileSdk = 35; buildToolsVer
         buildConfigField("String", "API_BASE_URL", "\"${(project.findProperty("apiBaseUrl") as String?) ?: "https://api-production-b04a.up.railway.app"}\"")
         manifestPlaceholders["cleartext"] = "false"
         // WEB OAuth client id (same one you put in backend GOOGLE_CLIENT_IDS). ./gradlew ... -PgoogleWebClientId=xxxx.apps.googleusercontent.com
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${(project.findProperty("googleWebClientId") as String?) ?: "690981910278-20difr2paa1o52aod7pb22go0elk61ou.apps.googleusercontent.com"}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${(project.findProperty("googleWebClientId") as String?) ?: "690981910278-n3e0l0n65uf2uvv3bgm0206v78u57gp1.apps.googleusercontent.com.apps.googleusercontent.com"}\"")
     }
     buildTypes { debug { manifestPlaceholders["cleartext"] = "true" } }
     buildFeatures { compose = true; buildConfig = true }
